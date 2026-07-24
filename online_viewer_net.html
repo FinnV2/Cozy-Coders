@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cozy Code Nook</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Pyodide for Browser Python Execution -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+
+    <style>
+        :root {
+            --bg-deep: #0e1117;
+            --panel-bg: rgba(22, 26, 36, 0.85);
+            --panel-border: rgba(255, 255, 255, 0.08);
+            --accent-soft: #a5c4d4;
+            --accent-warm: #e5c07b;
+            --accent-sage: #98c379;
+            --text-main: #e2e8f0;
+            --text-muted: #8a93a5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Ambient Fullscreen Canvas */
+        #rainCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* ---------------- VIEW MANAGEMENT ---------------- */
+        .view-section {
+            display: none;
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            height: 100vh;
+        }
+
+        .view-section.active {
+            display: flex;
+        }
+
+        /* ---------------- FULLSCREEN HOME PAGE STYLES ---------------- */
+        #homeView {
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .ambient-glow-1 {
+            position: absolute;
+            top: 20%;
+            left: 15%;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(165, 196, 212, 0.08) 0%, rgba(14, 17, 23, 0) 70%);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .ambient-glow-2 {
+            position: absolute;
+            bottom: 15%;
+            right: 15%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(152, 195, 121, 0.05) 0%, rgba(14, 17, 23, 0) 70%);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .hero-container {
+            position: relative;
+            z-index: 2;
+            max-width: 800px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: fadeIn 1s ease-out;
+        }
+
+        .hero-icon {
+            font-size: 4.5rem;
+            margin-bottom: 1.2rem;
+            display: inline-block;
+            animation: float 4s ease-in-out infinite;
+            filter: drop-shadow(0 10px 20px rgba(165, 196, 212, 0.2));
+        }
+
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 1rem;
+            color: #ffffff;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .hero-subtitle {
+            color: var(--text-muted);
+            font-size: 1.25rem;
+            line-height: 1.6;
+            max-width: 560px;
+            margin-bottom: 2.8rem;
+        }
+
+        .btn-start {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.8rem;
+            padding: 1.1rem 2.8rem;
+            font-size: 1.2rem;
+            font-weight: 700;
+            font-family: 'Quicksand', sans-serif;
+            color: #0e1117;
+            background: var(--accent-soft);
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 30px rgba(165, 196, 212, 0.25);
+        }
+
+        .btn-start:hover {
+            background: #c2e2f2;
+            transform: translateY(-4px) scale(1.03);
+            box-shadow: 0 15px 35px rgba(165, 196, 212, 0.4);
+        }
+
+        /* ---------------- EDITOR WORKSPACE STYLES ---------------- */
+        #editorView {
+            flex-direction: column;
+            padding: 1.2rem;
+            gap: 1rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            padding: 0.75rem 1.25rem;
+            border-radius: 14px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .title-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .title-group h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: var(--text-main);
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+
+        .btn {
+            font-family: 'Quicksand', sans-serif;
+            font-weight: 600;
+            font-size: 0.85rem;
+            border: none;
+            outline: none;
+            padding: 0.5rem 1.1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-main);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            transform: translateY(-1px);
+        }
+
+        .btn-active {
+            background: rgba(165, 196, 212, 0.18);
+            border-color: rgba(165, 196, 212, 0.4);
+            color: var(--accent-soft);
+        }
+
+        .btn-run {
+            background: rgba(152, 195, 121, 0.18);
+            border-color: rgba(152, 195, 121, 0.35);
+            color: var(--accent-sage);
+        }
+
+        .btn-run:hover {
+            background: rgba(152, 195, 121, 0.3);
+        }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            contain: content;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.65rem 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid var(--panel-border);
+        }
+
+        .lang-tabs {
+            display: flex;
+            gap: 0.4rem;
+        }
+
+        .tab {
+            padding: 0.35rem 0.8rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: color 0.15s ease, background 0.15s ease;
+            background: transparent;
+            border: none;
+        }
+
+        .tab:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab.active {
+            color: var(--accent-soft);
+            background: rgba(165, 196, 212, 0.15);
+        }
+
+        .editor-container {
+            flex: 1;
+            position: relative;
+            display: flex;
+            overflow: hidden;
+        }
+
+        textarea#codeEditor {
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-main);
+            font-family: 'Fira Code', monospace;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            padding: 1rem;
+            resize: none;
+            tab-size: 4;
+            will-change: transform;
+            transform: translateZ(0);
+        }
+
+        .autocomplete-popup {
+            position: absolute;
+            background: #1a1e2b;
+            border: 1px solid rgba(165, 196, 212, 0.3);
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            z-index: 100;
+            display: none;
+            max-height: 180px;
+            overflow-y: auto;
+            min-width: 160px;
+            padding: 4px;
+        }
+
+        .autocomplete-item {
+            padding: 6px 12px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: var(--text-main);
+            cursor: pointer;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .autocomplete-item:hover, .autocomplete-item.selected {
+            background: rgba(165, 196, 212, 0.2);
+            color: #ffffff;
+        }
+
+        .autocomplete-item .item-type {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .output-panel-body {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .output-container {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #dcdfe4;
+        }
+
+        iframe#htmlPreview {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #ffffff;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .console-log {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .console-log .log-line {
+            margin-bottom: 0.2rem;
+        }
+
+        .console-log .log-error {
+            color: #e06c75;
+        }
+
+        .console-log .log-system {
+            color: var(--accent-warm);
+            font-style: italic;
+        }
+
+        .console-log .log-prompt {
+            color: var(--accent-warm);
+            font-weight: 600;
+        }
+
+        .console-log .log-user {
+            color: var(--accent-soft);
+        }
+
+        .error-explain-container {
+            margin-top: 0.6rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .btn-explain {
+            background: rgba(229, 192, 123, 0.15);
+            border: 1px solid rgba(229, 192, 123, 0.4);
+            color: var(--accent-warm);
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Quicksand', sans-serif;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-explain:hover {
+            background: rgba(229, 192, 123, 0.28);
+            transform: translateY(-1px);
+        }
+
+        .explanation-card {
+            background: rgba(229, 192, 123, 0.08);
+            border-left: 3px solid var(--accent-warm);
+            padding: 0.8rem;
+            border-radius: 0 8px 8px 0;
+            margin-top: 0.5rem;
+            font-family: 'Quicksand', sans-serif;
+            font-size: 0.9rem;
+            color: var(--text-main);
+            line-height: 1.5;
+        }
+
+        .terminal-input-bar {
+            display: flex;
+            align-items: center;
+            padding: 0.6rem 0.8rem;
+            background: rgba(0, 0, 0, 0.35);
+            border-top: 1px solid var(--panel-border);
+            gap: 0.5rem;
+        }
+
+        .terminal-prompt-label {
+            color: var(--accent-warm);
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .terminal-input {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--accent-soft);
+            border-radius: 6px;
+            color: var(--text-main);
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            padding: 0.4rem 0.6rem;
+            outline: none;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .terminal-input:focus {
+            border-color: var(--accent-sage);
+            box-shadow: 0 0 8px rgba(152, 195, 121, 0.3);
+        }
+
+        .terminal-input:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            border-color: transparent;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 10;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal {
+            background: #1a1e2b;
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            padding: 1.8rem;
+            width: 360px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        .modal h2 {
+            font-size: 1.15rem;
+            margin-bottom: 1.4rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .setting-group {
+            margin-bottom: 1.2rem;
+        }
+
+        .setting-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            margin-bottom: 0.4rem;
+            color: var(--text-muted);
+        }
+
+        .slider {
+            width: 100%;
+            accent-color: var(--accent-soft);
+            cursor: pointer;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 850px) {
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+            .hero-title {
+                font-size: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="rainCanvas"></canvas>
+
+    <!-- 1. FULLSCREEN HOME LANDING VIEW -->
+    <div class="view-section active" id="homeView">
+        <div class="ambient-glow-1"></div>
+        <div class="ambient-glow-2"></div>
+        
+        <div class="hero-container">
+            <div class="hero-icon">🌧️</div>
+            <h1 class="hero-title">Cozy Code Nook</h1>
+            <p class="hero-subtitle">A quiet, relaxing space to write code, experiment, and learn without stress.</p>
+            <button class="btn-start" id="startCodingBtn">
+                <span>Start Coding</span>
+                <span style="font-size: 1.2rem;">➔</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. CODE EDITOR WORKSPACE VIEW -->
+    <div class="view-section" id="editorView">
+        <header>
+            <div class="title-group">
+                <button class="btn" id="homeBtn" style="padding: 0.4rem 0.8rem;">🏠 Home</button>
+                <span style="font-size: 1.3rem;">🌧️</span>
+                <h1>Cozy Code Nook</h1>
+            </div>
+            <div class="header-controls">
+                <button class="btn btn-active" id="helperToggleBtn">💡 Helper: On</button>
+                <button class="btn" id="audioToggleBtn">
+                    <span id="audioIcon">🎵</span> Sound: Off
+                </button>
+                <button class="btn" id="settingsBtn">⚙️ Settings</button>
+                <button class="btn btn-run" id="runBtn">▶ Run Code</button>
+            </div>
+        </header>
+
+        <div class="workspace">
+            <!-- Left: Code Editor -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="lang-tabs">
+                        <button class="tab active" data-lang="python">Python</button>
+                        <button class="tab" data-lang="javascript">JavaScript</button>
+                        <button class="tab" data-lang="html">HTML</button>
+                    </div>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);" id="pyStatus">Ready</span>
+                </div>
+                <div class="editor-container" id="editorContainer">
+                    <textarea id="codeEditor" spellcheck="false" placeholder="Write your code here..."></textarea>
+                    <div id="autocompletePopup" class="autocomplete-popup"></div>
+                </div>
+            </div>
+
+            <!-- Right: Output Console -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-muted);">Output</span>
+                    <button class="btn" id="clearBtn" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;">Clear</button>
+                </div>
+                <div class="output-panel-body">
+                    <div class="output-container" id="outputConsole">
+                        <div class="console-log" id="logContent">
+                            <div class="log-line log-system">Press "Run Code" to execute script...</div>
+                        </div>
+                        <iframe id="htmlPreview"></iframe>
+                    </div>
+
+                    <div class="terminal-input-bar">
+                        <span class="terminal-prompt-label" id="terminalPrompt">Input:</span>
+                        <input type="text" class="terminal-input" id="terminalInput" placeholder="Waiting for code..." disabled>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <h2>
+                <span>Settings</span>
+                <span style="cursor: pointer; font-size: 1rem;" id="closeSettings">✕</span>
+            </h2>
+            <div class="setting-group">
+                <label><span>Lo-Fi Music Volume</span><span id="musicVolVal">30%</span></label>
+                <input type="range" class="slider" id="musicVol" min="0" max="100" value="30">
+            </div>
+            <div class="setting-group">
+                <label><span>Drizzle & Tapping</span><span id="rainVolVal">40%</span></label>
+                <input type="range" class="slider" id="rainVol" min="0" max="100" value="40">
+            </div>
+            <div class="setting-group">
+                <label><span>Rain Density</span><span id="rainDensityVal">Heavy</span></label>
+                <input type="range" class="slider" id="rainDensity" min="30" max="150" value="80">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // PAGE NAVIGATION SWITCHING
+        const homeView = document.getElementById('homeView');
+        const editorView = document.getElementById('editorView');
+        const startCodingBtn = document.getElementById('startCodingBtn');
+        const homeBtn = document.getElementById('homeBtn');
+
+        startCodingBtn.addEventListener('click', () => {
+            homeView.classList.remove('active');
+            editorView.classList.add('active');
+        });
+
+        homeBtn.addEventListener('click', () => {
+            editorView.classList.remove('active');
+            homeView.classList.add('active');
+        });
+
+        // Built-in Language Auto-completion Databases
+        const languageCompletions = {
+            python: [
+                { label: 'input()', insertText: 'input()', type: 'func' },
+                { label: 'print()', insertText: 'print()', type: 'func' },
+                { label: 'import', insertText: 'import ', type: 'kw' },
+                { label: 'def', insertText: 'def ', type: 'kw' },
+                { label: 'return', insertText: 'return ', type: 'kw' },
+                { label: 'if', insertText: 'if ', type: 'kw' },
+                { label: 'elif', insertText: 'elif ', type: 'kw' },
+                { label: 'else:', insertText: 'else:\n    ', type: 'kw' },
+                { label: 'for', insertText: 'for ', type: 'kw' },
+                { label: 'while', insertText: 'while ', type: 'kw' },
+                { label: 'range()', insertText: 'range()', type: 'func' },
+                { label: 'len()', insertText: 'len()', type: 'func' },
+                { label: 'str()', insertText: 'str()', type: 'func' },
+                { label: 'int()', insertText: 'int()', type: 'func' },
+                { label: 'float()', insertText: 'float()', type: 'func' },
+                { label: 'list()', insertText: 'list()', type: 'func' },
+                { label: 'dict()', insertText: 'dict()', type: 'func' },
+                { label: 'append()', insertText: 'append()', type: 'method' }
+            ],
+            javascript: [
+                { label: 'console.log()', insertText: 'console.log()', type: 'func' },
+                { label: 'const', insertText: 'const ', type: 'kw' },
+                { label: 'let', insertText: 'let ', type: 'kw' },
+                { label: 'var', insertText: 'var ', type: 'kw' },
+                { label: 'function', insertText: 'function ', type: 'kw' },
+                { label: 'return', insertText: 'return ', type: 'kw' },
+                { label: 'async', insertText: 'async ', type: 'kw' },
+                { label: 'await', insertText: 'await ', type: 'kw' },
+                { label: 'prompt()', insertText: 'prompt()', type: 'func' },
+                { label: 'if', insertText: 'if ()', type: 'kw' },
+                { label: 'else', insertText: 'else {\n    \n}', type: 'kw' },
+                { label: 'forEach()', insertText: 'forEach()', type: 'method' },
+                { label: 'map()', insertText: 'map()', type: 'method' },
+                { label: 'push()', insertText: 'push()', type: 'method' }
+            ],
+            html: [
+                { label: '<div>', insertText: '<div></div>', type: 'tag' },
+                { label: '<p>', insertText: '<p></p>', type: 'tag' },
+                { label: '<h1>', insertText: '<h1></h1>', type: 'tag' },
+                { label: '<h2>', insertText: '<h2></h2>', type: 'tag' },
+                { label: '<span>', insertText: '<span></span>', type: 'tag' },
+                { label: '<button>', insertText: '<button></button>', type: 'tag' },
+                { label: '<input>', insertText: '<input type="text">', type: 'tag' },
+                { label: '<style>', insertText: '<style>\n\n</style>', type: 'tag' },
+                { label: '<script>', insertText: '<script>\n\n<\/script>', type: 'tag' }
+            ]
+        };
+
+        const defaultCode = {
+            python: `NAME = "Alex"\na = input("wsg: ")\nprint(f"Hello {NAME}, you replied: {a} ☕")`,
+            javascript: `// Interactive JavaScript Example\nconst NAME = "Alex";\nconst drink = await prompt("What's your favorite warm drink?");\nconsole.log(\`Enjoy your cozy cup of \${drink}, \${NAME}! ☕\`);`,
+            html: `<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body {\n      background: #1e222d;\n      color: #a5c4d4;\n      font-family: sans-serif;\n      display: flex;\n      justify-content: center;\n      align-items: center;\n      height: 100vh;\n      margin: 0;\n    }\n    .card {\n      background: rgba(255,255,255,0.05);\n      padding: 2rem;\n      border-radius: 16px;\n      text-align: center;\n    }\n  </style>\n</head>\n<body>\n  <div class="card">\n    <h2>🌧️ Cozy Live Preview</h2>\n    <p>Edit HTML/CSS & press Run!</p>\n  </div>\n</body>\n</html>`
+        };
+
+        let currentLang = 'python';
+        let pyodideInstance = null;
+        let isHelperEnabled = true;
+        let selectedSuggestionIndex = 0;
+        let activeSuggestions = [];
+
+        const codeEditor = document.getElementById('codeEditor');
+        const autocompletePopup = document.getElementById('autocompletePopup');
+        const helperToggleBtn = document.getElementById('helperToggleBtn');
+        const logContent = document.getElementById('logContent');
+        const outputConsole = document.getElementById('outputConsole');
+        const htmlPreview = document.getElementById('htmlPreview');
+        const pyStatus = document.getElementById('pyStatus');
+        const terminalInput = document.getElementById('terminalInput');
+        const terminalPrompt = document.getElementById('terminalPrompt');
+
+        codeEditor.value = defaultCode[currentLang];
+
+        helperToggleBtn.addEventListener('click', () => {
+            isHelperEnabled = !isHelperEnabled;
+            if (isHelperEnabled) {
+                helperToggleBtn.innerText = '💡 Helper: On';
+                helperToggleBtn.classList.add('btn-active');
+            } else {
+                helperToggleBtn.innerText = '💡 Helper: Off';
+                helperToggleBtn.classList.remove('btn-active');
+                hideAutocomplete();
+            }
+        });
+
+        const autoPairs = { "'": "'", '"': '"', '(': ')', '[': ']', '{': '}' };
+
+        function extractVariablesFromCode(code) {
+            const vars = new Set();
+            const patterns = [
+                /\b(?:let|const|var)\s+([a-zA-Z_][a-zA-Z0-9_]*)/g, 
+                /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*=/g,                
+                /\bdef\s+([a-zA-Z_][a-zA-Z0-9_]*)/g,             
+                /\bfunction\s+([a-zA-Z_][a-zA-Z0-9_]*)/g          
+            ];
+
+            patterns.forEach(regex => {
+                let match;
+                while ((match = regex.exec(code)) !== null) {
+                    const name = match[1];
+                    if (!['if', 'for', 'while', 'return', 'def', 'class', 'import', 'let', 'const', 'var', 'function'].includes(name)) {
+                        vars.add(name);
+                    }
+                }
+            });
+
+            return Array.from(vars).map(v => ({ label: v, insertText: v, type: 'var' }));
+        }
+
+        function getCaretCoordinates() {
+            let mirror = document.getElementById('caretMirror');
+            if (!mirror) {
+                mirror = document.createElement('div');
+                mirror.id = 'caretMirror';
+                document.body.appendChild(mirror);
+            }
+
+            const style = window.getComputedStyle(codeEditor);
+            mirror.style.position = 'absolute';
+            mirror.style.visibility = 'hidden';
+            mirror.style.whiteSpace = 'pre-wrap';
+            mirror.style.wordWrap = 'break-word';
+            mirror.style.fontFamily = style.fontFamily;
+            mirror.style.fontSize = style.fontSize;
+            mirror.style.lineHeight = style.lineHeight;
+            mirror.style.padding = style.padding;
+            mirror.style.border = style.border;
+            mirror.style.boxSizing = style.boxSizing;
+            mirror.style.width = codeEditor.offsetWidth + 'px';
+            mirror.style.height = codeEditor.offsetHeight + 'px';
+            mirror.style.overflow = 'hidden';
+
+            const pos = codeEditor.selectionStart;
+            const text = codeEditor.value.substring(0, pos);
+
+            mirror.textContent = text;
+            const span = document.createElement('span');
+            span.textContent = codeEditor.value.substring(pos) || '.';
+            mirror.appendChild(span);
+
+            const spanRect = span.getBoundingClientRect();
+            const mirrorRect = mirror.getBoundingClientRect();
+
+            const top = spanRect.top - mirrorRect.top - codeEditor.scrollTop + 28;
+            const left = spanRect.left - mirrorRect.left - codeEditor.scrollLeft;
+
+            return {
+                top: Math.max(10, Math.min(top, codeEditor.offsetHeight - 50)),
+                left: Math.max(10, Math.min(left, codeEditor.offsetWidth - 180))
+            };
+        }
+
+        function applySuggestion(item) {
+            const cursor = codeEditor.selectionStart;
+            const text = codeEditor.value;
+            const leftText = text.substring(0, cursor);
+            const rightText = text.substring(cursor);
+
+            const match = leftText.match(/[a-zA-Z0-9_<>-]+$/);
+            if (match) {
+                const prefix = match[0];
+                const newLeft = leftText.substring(0, leftText.length - prefix.length);
+                codeEditor.value = newLeft + item.insertText + rightText;
+                
+                let newCursor = newLeft.length + item.insertText.length;
+                if (item.insertText.endsWith('()')) {
+                    newCursor -= 1;
+                } else if (item.insertText.endsWith('></' + item.label.slice(1))) {
+                    newCursor = newLeft.length + item.label.length;
+                }
+                
+                codeEditor.selectionStart = newCursor;
+                codeEditor.selectionEnd = newCursor;
+            }
+            hideAutocomplete();
+            codeEditor.focus();
+        }
+
+        function hideAutocomplete() {
+            autocompletePopup.style.display = 'none';
+            activeSuggestions = [];
+            selectedSuggestionIndex = 0;
+        }
+
+        function updateAutocomplete() {
+            if (!isHelperEnabled) {
+                hideAutocomplete();
+                return;
+            }
+
+            const cursor = codeEditor.selectionStart;
+            const text = codeEditor.value;
+            const leftText = text.substring(0, cursor);
+            const match = leftText.match(/[a-zA-Z0-9_<>-]+$/);
+
+            if (!match || match[0].length < 1) {
+                hideAutocomplete();
+                return;
+            }
+
+            const prefix = match[0].toLowerCase();
+            const builtIns = languageCompletions[currentLang] || [];
+            const customVars = extractVariablesFromCode(text);
+            
+            const combinedMap = new Map();
+            customVars.forEach(v => combinedMap.set(v.label.toLowerCase(), v));
+            builtIns.forEach(b => {
+                if (!combinedMap.has(b.label.toLowerCase())) {
+                    combinedMap.set(b.label.toLowerCase(), b);
+                }
+            });
+
+            const currentList = Array.from(combinedMap.values());
+            activeSuggestions = currentList.filter(item => item.label.toLowerCase().startsWith(prefix));
+
+            if (activeSuggestions.length === 0) {
+                hideAutocomplete();
+                return;
+            }
+
+            autocompletePopup.innerHTML = '';
+            selectedSuggestionIndex = 0;
+
+            activeSuggestions.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = `autocomplete-item ${index === 0 ? 'selected' : ''}`;
+                div.innerHTML = `<span>${item.label}</span><span class="item-type">${item.type}</span>`;
+                div.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    applySuggestion(item);
+                });
+                autocompletePopup.appendChild(div);
+            });
+
+            const coords = getCaretCoordinates();
+            autocompletePopup.style.display = 'block';
+            autocompletePopup.style.top = `${coords.top}px`;
+            autocompletePopup.style.left = `${coords.left}px`;
+        }
+
+        codeEditor.addEventListener('input', updateAutocomplete);
+        codeEditor.addEventListener('scroll', () => {
+            if (autocompletePopup.style.display === 'block') {
+                const coords = getCaretCoordinates();
+                autocompletePopup.style.top = `${coords.top}px`;
+                autocompletePopup.style.left = `${coords.left}px`;
+            }
+        });
+
+        codeEditor.addEventListener('keydown', (e) => {
+            const start = codeEditor.selectionStart;
+            const end = codeEditor.selectionEnd;
+
+            if (autocompletePopup.style.display === 'block' && activeSuggestions.length > 0) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    selectedSuggestionIndex = (selectedSuggestionIndex + 1) % activeSuggestions.length;
+                    highlightSuggestion();
+                    return;
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    selectedSuggestionIndex = (selectedSuggestionIndex - 1 + activeSuggestions.length) % activeSuggestions.length;
+                    highlightSuggestion();
+                    return;
+                } else if (e.key === 'Tab' || e.key === 'Enter') {
+                    e.preventDefault();
+                    applySuggestion(activeSuggestions[selectedSuggestionIndex]);
+                    return;
+                } else if (e.key === 'Escape') {
+                    hideAutocomplete();
+                    return;
+                }
+            }
+
+            if (e.key === 'Tab' && autocompletePopup.style.display !== 'block') {
+                e.preventDefault();
+                codeEditor.value = codeEditor.value.substring(0, start) + '    ' + codeEditor.value.substring(end);
+                codeEditor.selectionStart = start + 4;
+                codeEditor.selectionEnd = start + 4;
+                return;
+            }
+
+            if (autoPairs[e.key]) {
+                const openChar = e.key;
+                const closeChar = autoPairs[e.key];
+
+                if (start !== end) {
+                    e.preventDefault();
+                    const selectedText = codeEditor.value.substring(start, end);
+                    codeEditor.value = codeEditor.value.substring(0, start) + openChar + selectedText + closeChar + codeEditor.value.substring(end);
+                    codeEditor.selectionStart = start + 1;
+                    codeEditor.selectionEnd = end + 1;
+                } else {
+                    e.preventDefault();
+                    codeEditor.value = codeEditor.value.substring(0, start) + openChar + closeChar + codeEditor.value.substring(end);
+                    codeEditor.selectionStart = start + 1;
+                    codeEditor.selectionEnd = start + 1;
+                }
+            } else if (['"', "'", ')', ']', '}'].includes(e.key)) {
+                if (start === end && codeEditor.value.charAt(start) === e.key) {
+                    e.preventDefault();
+                    codeEditor.selectionStart = start + 1;
+                    codeEditor.selectionEnd = start + 1;
+                }
+            }
+        });
+
+        function highlightSuggestion() {
+            const items = autocompletePopup.querySelectorAll('.autocomplete-item');
+            items.forEach((item, idx) => {
+                if (idx === selectedSuggestionIndex) {
+                    item.classList.add('selected');
+                    item.scrollIntoView({ block: 'nearest' });
+                } else {
+                    item.classList.remove('selected');
+                }
+            });
+        }
+
+        // Tab Switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                currentLang = e.target.getAttribute('data-lang');
+                codeEditor.value = defaultCode[currentLang];
+                hideAutocomplete();
+                
+                if (currentLang === 'html') {
+                    logContent.style.display = 'none';
+                    htmlPreview.style.display = 'block';
+                } else {
+                    logContent.style.display = 'block';
+                    htmlPreview.style.display = 'none';
+                }
+            });
+        });
+
+        let inputResolver = null;
+
+        function requestConsoleInput(promptText) {
+            return new Promise((resolve) => {
+                inputResolver = resolve;
+                if (promptText) appendLog(promptText, 'log-prompt');
+
+                terminalPrompt.innerText = promptText || 'Input:';
+                terminalInput.disabled = false;
+                terminalInput.value = '';
+                terminalInput.placeholder = 'Type response & hit Enter...';
+                terminalInput.focus();
+            });
+        }
+
+        terminalInput.addEventListener('keydown', (e) => {
+            playKeyClick(e.key);
+            if (e.key === 'Enter' && inputResolver) {
+                const value = terminalInput.value;
+                appendLog(`> ${value}`, 'log-user');
+                
+                terminalInput.value = '';
+                terminalInput.disabled = true;
+                terminalInput.placeholder = 'Waiting for code...';
+                terminalPrompt.innerText = 'Input:';
+
+                const resolve = inputResolver;
+                inputResolver = null;
+                resolve(value);
+            }
+        });
+
+        // PLAIN ENGLISH ERROR EXPLAINER
+        function translateErrorToPlainEnglish(errStr) {
+            const str = errStr.toString();
+
+            if (str.includes('NameError') || str.includes('ReferenceError')) {
+                const varName = str.match(/name '([^']+)' is not defined/) || str.match(/([a-zA-Z0-9_$]+) is not defined/);
+                const nameStr = varName ? `<strong>"${varName[1]}"</strong>` : 'a variable or function';
+                return `<strong>Missing Variable:</strong> You are using ${nameStr} before defining it. Make sure you typed the name correctly or defined it earlier in your code!`;
+            }
+
+            if (str.includes('SyntaxError')) {
+                if (str.includes('unexpected EOF') || str.includes('EOL while scanning') || str.includes('Unterminated')) {
+                    return `<strong>Unclosed Quote or Bracket:</strong> You forgot to close a string quote (<code>"</code> or <code>'</code>) or bracket (<code>)</code>, <code>]</code>, <code>}</code>).`;
+                }
+                if (str.includes('expected \':\'')) {
+                    return `<strong>Missing Colon:</strong> Statements like <code>if</code>, <code>for</code>, or <code>def</code> in Python require a colon (<code>:</code>) at the end of the line.`;
+                }
+                return `<strong>Syntax Error:</strong> The computer couldn't read your code structure. Double-check for missing commas or typos.`;
+            }
+
+            if (str.includes('IndentationError')) {
+                return `<strong>Spacing Error:</strong> Code inside blocks (like after <code>if</code> or <code>def</code>) must be indented evenly with 4 spaces.`;
+            }
+
+            if (str.includes('TypeError')) {
+                return `<strong>Type Mismatch:</strong> An operation was given the wrong kind of data (e.g., mixing numbers and strings directly).`;
+            }
+
+            if (str.includes('ZeroDivisionError')) {
+                return `<strong>Divide by Zero:</strong> You tried to divide a number by <code>0</code>, which isn't allowed!`;
+            }
+
+            return `<strong>Code Issue:</strong> The script ran into a problem: <em>${str.split('\n').pop()}</em>. Check your spelling and syntax around this line.`;
+        }
+
+        function appendErrorWithExplainButton(errorMessage) {
+            appendLog(errorMessage, 'log-error');
+
+            const container = document.createElement('div');
+            container.className = 'error-explain-container';
+
+            const btn = document.createElement('button');
+            btn.className = 'btn-explain';
+            btn.innerHTML = '💡 Explain Error in Plain English';
+
+            const card = document.createElement('div');
+            card.className = 'explanation-card';
+            card.style.display = 'none';
+
+            btn.addEventListener('click', () => {
+                if (card.style.display === 'none') {
+                    card.innerHTML = translateErrorToPlainEnglish(errorMessage);
+                    card.style.display = 'block';
+                    btn.innerHTML = '✨ Hide Explanation';
+                } else {
+                    card.style.display = 'none';
+                    btn.innerHTML = '💡 Explain Error in Plain English';
+                }
+            });
+
+            container.appendChild(btn);
+            container.appendChild(card);
+            logContent.appendChild(container);
+            outputConsole.scrollTop = outputConsole.scrollHeight;
+        }
+
+        // Initialize Pyodide
+        async function initPyodide() {
+            try {
+                pyStatus.innerText = 'Loading Python...';
+                pyodideInstance = await loadPyodide();
+                pyStatus.innerText = 'Python Ready';
+            } catch (err) {
+                pyStatus.innerText = 'Pyodide Offline';
+            }
+        }
+        initPyodide();
+
+        // Code Execution Handler
+        document.getElementById('runBtn').addEventListener('click', async () => {
+            const code = codeEditor.value;
+            logContent.innerHTML = '';
+            
+            terminalInput.disabled = true;
+            terminalInput.value = '';
+            terminalInput.placeholder = 'Running...';
+
+            if (currentLang === 'javascript') {
+                logContent.style.display = 'block';
+                htmlPreview.style.display = 'none';
+                
+                const logs = [];
+                const originalLog = console.log;
+
+                console.log = (...args) => {
+                    logs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '));
+                };
+
+                try {
+                    const fn = new Function('requestConsoleInput', `
+                        return (async () => {
+                            const prompt = async (msg) => await requestConsoleInput(msg);
+                            ${code}
+                        })();
+                    `);
+
+                    await fn(requestConsoleInput);
+                    if (logs.length > 0) logs.forEach(l => appendLog(l));
+                } catch (err) {
+                    appendErrorWithExplainButton(err.toString());
+                } finally {
+                    console.log = originalLog;
+                    terminalInput.placeholder = 'Execution complete';
+                }
+            } else if (currentLang === 'python') {
+                logContent.style.display = 'block';
+                htmlPreview.style.display = 'none';
+
+                if (!pyodideInstance) {
+                    appendLog('Python runtime is loading, please wait a moment...', 'log-system');
+                    return;
+                }
+
+                try {
+                    pyodideInstance.setStdout({ batched: (str) => appendLog(str) });
+
+                    await pyodideInstance.runPythonAsync(`
+import builtins
+import js
+
+async def _custom_input(prompt_text=""):
+    return await js.requestConsoleInput(prompt_text)
+
+builtins._custom_input = _custom_input
+`);
+
+                    let transformedCode = code.replace(/\binput\s*\(/g, 'await builtins._custom_input(');
+
+                    await pyodideInstance.runPythonAsync(`
+async def __run_user_code__():
+${transformedCode.split('\n').map(line => '    ' + line).join('\n')}
+
+await __run_user_code__()
+`);
+
+                } catch (err) {
+                    appendErrorWithExplainButton(err.toString());
+                } finally {
+                    if (!inputResolver) terminalInput.placeholder = 'Execution complete';
+                }
+            } else if (currentLang === 'html') {
+                logContent.style.display = 'none';
+                htmlPreview.style.display = 'block';
+                const iframeDoc = htmlPreview.contentDocument || htmlPreview.contentWindow.document;
+                iframeDoc.open();
+                iframeDoc.write(code);
+                iframeDoc.close();
+                terminalInput.placeholder = 'Preview updated';
+            }
+        });
+
+        function appendLog(text, className = '') {
+            const line = document.createElement('div');
+            line.className = `log-line ${className}`;
+            line.innerText = text;
+            logContent.appendChild(line);
+            outputConsole.scrollTop = outputConsole.scrollHeight;
+        }
+
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            logContent.innerHTML = '';
+        });
+
+        // ================= ENHANCED FULL-SCREEN RAIN ANIMATION =================
+        const canvas = document.getElementById('rainCanvas');
+        const ctx = canvas.getContext('2d');
+        let drops = [];
+        let ripples = [];
+        let rainCount = 80;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Drop {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * -canvas.height;
+                this.length = Math.random() * 18 + 8;
+                this.speed = Math.random() * 4 + 3;
+                this.opacity = Math.random() * 0.25 + 0.08;
+                this.wind = Math.random() * 0.5 - 0.25;
+            }
+            update() {
+                this.y += this.speed;
+                this.x += this.wind;
+                if (this.y > canvas.height) {
+                    if (Math.random() > 0.6) {
+                        ripples.push(new Ripple(this.x, canvas.height - Math.random() * 15));
+                    }
+                    this.reset();
+                }
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                ctx.lineTo(this.x + this.wind * 2, this.y + this.length);
+                ctx.strokeStyle = `rgba(165, 196, 212, ${this.opacity})`;
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+            }
+        }
+
+        class Ripple {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 1;
+                this.maxRadius = Math.random() * 8 + 4;
+                this.opacity = 0.3;
+            }
+            update() {
+                this.radius += 0.4;
+                this.opacity -= 0.015;
+            }
+            draw() {
+                if (this.opacity <= 0) return;
+                ctx.beginPath();
+                ctx.ellipse(this.x, this.y, this.radius, this.radius * 0.4, 0, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(165, 196, 212, ${this.opacity})`;
+                ctx.lineWidth = 0.8;
+                ctx.stroke();
+            }
+        }
+
+        function initRain() {
+            drops = [];
+            ripples = [];
+            for (let i = 0; i < rainCount; i++) drops.push(new Drop());
+        }
+        initRain();
+
+        function animateRain() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drops.forEach(d => { d.update(); d.draw(); });
+            
+            for (let i = ripples.length - 1; i >= 0; i--) {
+                ripples[i].update();
+                ripples[i].draw();
+                if (ripples[i].opacity <= 0) ripples.splice(i, 1);
+            }
+
+            requestAnimationFrame(animateRain);
+        }
+        animateRain();
+
+        // ================= SOUND ENGINE =================
+        let audioCtx = null;
+        let isAudioPlaying = false;
+        let rainGainNode = null;
+        let musicGainNode = null;
+        let musicInterval = null;
+        let pitterPatterInterval = null;
+
+        function initAudio() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+            const bufferSize = audioCtx.sampleRate * 2;
+            const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = (Math.random() * 2 - 1) * 0.015;
+            }
+
+            const lightNoise = audioCtx.createBufferSource();
+            lightNoise.buffer = noiseBuffer;
+            lightNoise.loop = true;
+
+            const drizzleFilter = audioCtx.createBiquadFilter();
+            drizzleFilter.type = 'bandpass';
+            drizzleFilter.frequency.value = 3500;
+            drizzleFilter.Q.value = 0.8;
+
+            rainGainNode = audioCtx.createGain();
+            rainGainNode.gain.value = 0.4;
+
+            lightNoise.connect(drizzleFilter);
+            drizzleFilter.connect(rainGainNode);
+            rainGainNode.connect(audioCtx.destination);
+            lightNoise.start();
+
+            musicGainNode = audioCtx.createGain();
+            musicGainNode.gain.value = 0.3;
+            musicGainNode.connect(audioCtx.destination);
+        }
+
+        function triggerSoftTap() {
+            if (!audioCtx || !isAudioPlaying) return;
+
+            const osc = audioCtx.createOscillator();
+            const tapGain = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+
+            filter.type = 'highpass';
+            filter.frequency.value = 2200 + Math.random() * 1200;
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1800 + Math.random() * 800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.015);
+
+            tapGain.gain.setValueAtTime(0.005 + Math.random() * 0.012, audioCtx.currentTime);
+            tapGain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.02);
+
+            osc.connect(filter);
+            filter.connect(tapGain);
+            tapGain.connect(rainGainNode);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.025);
+        }
+
+        function playKeyClick(key) {
+            if (!audioCtx || !isAudioPlaying) return;
+
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const clickGain = audioCtx.createGain();
+
+            osc.type = 'triangle';
+            const isHeavyKey = key === 'Enter' || key === ' ';
+            const baseFreq = isHeavyKey ? 250 + Math.random() * 100 : 500 + Math.random() * 200;
+
+            osc.frequency.setValueAtTime(baseFreq * 2, now);
+            osc.frequency.exponentialRampToValueAtTime(80, now + 0.012);
+
+            clickGain.gain.setValueAtTime(0.04, now);
+            clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.015);
+
+            osc.connect(clickGain);
+            clickGain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.02);
+        }
+
+        codeEditor.addEventListener('keydown', (e) => playKeyClick(e.key));
+
+        function startPitterPatter() {
+            pitterPatterInterval = setInterval(() => {
+                if (isAudioPlaying && Math.random() > 0.3) triggerSoftTap();
+            }, 90);
+        }
+
+        const chords = [
+            [261.63, 329.63, 392.00, 493.88],
+            [220.00, 261.63, 329.63, 392.00],
+            [174.61, 220.00, 261.63, 329.63],
+            [196.00, 246.94, 293.66, 349.23]
+        ];
+
+        function playSoftNote(freq) {
+            if (!audioCtx || !isAudioPlaying) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+            gain.gain.setValueAtTime(0, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.05, audioCtx.currentTime + 1.5);
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 4.5);
+
+            osc.connect(gain);
+            gain.connect(musicGainNode);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 4.6);
+        }
+
+        function startLoFiMusic() {
+            let chordIdx = 0;
+            musicInterval = setInterval(() => {
+                if (!isAudioPlaying) return;
+                chords[chordIdx].forEach(note => playSoftNote(note));
+                chordIdx = (chordIdx + 1) % chords.length;
+            }, 5000);
+        }
+
+        const audioToggleBtn = document.getElementById('audioToggleBtn');
+        audioToggleBtn.addEventListener('click', () => {
+            if (!audioCtx) initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            isAudioPlaying = !isAudioPlaying;
+
+            if (isAudioPlaying) {
+                audioToggleBtn.innerHTML = '<span>🎵</span> Sound: On';
+                audioToggleBtn.style.borderColor = 'rgba(165, 196, 212, 0.4)';
+                rainGainNode.gain.value = document.getElementById('rainVol').value / 100;
+                musicGainNode.gain.value = document.getElementById('musicVol').value / 100;
+                startLoFiMusic();
+                startPitterPatter();
+            } else {
+                audioToggleBtn.innerHTML = '<span>🎵</span> Sound: Off';
+                audioToggleBtn.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                if (rainGainNode) rainGainNode.gain.value = 0;
+                if (musicGainNode) musicGainNode.gain.value = 0;
+                clearInterval(musicInterval);
+                clearInterval(pitterPatterInterval);
+            }
+        });
+
+        // Settings Controls
+        const settingsModal = document.getElementById('settingsModal');
+        document.getElementById('settingsBtn').addEventListener('click', () => settingsModal.classList.add('active'));
+        document.getElementById('closeSettings').addEventListener('click', () => settingsModal.classList.remove('active'));
+
+        document.getElementById('musicVol').addEventListener('input', (e) => {
+            const val = e.target.value;
+            document.getElementById('musicVolVal').innerText = val + '%';
+            if (musicGainNode && isAudioPlaying) musicGainNode.gain.value = val / 100;
+        });
+
+        document.getElementById('rainVol').addEventListener('input', (e) => {
+            const val = e.target.value;
+            document.getElementById('rainVolVal').innerText = val + '%';
+            if (rainGainNode && isAudioPlaying) rainGainNode.gain.value = val / 100;
+        });
+
+        document.getElementById('rainDensity').addEventListener('input', (e) => {
+            rainCount = parseInt(e.target.value);
+            const labels = ["Light", "Medium", "Heavy", "Storm"];
+            const idx = rainCount < 50 ? 0 : rainCount < 90 ? 1 : rainCount < 120 ? 2 : 3;
+            document.getElementById('rainDensityVal').innerText = labels[idx];
+            initRain();
+        });
+    </script>
+</body>
+</html>
